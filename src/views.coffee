@@ -302,6 +302,7 @@ Ember.View.extend Ember.AddeparMixins.StyleBindingsMixin,
   ###
   onColumnResize: (event, ui) ->
     @elementSizeDidChange()
+    @set 'column.didResize', yes
     @get("column").resize(ui.size.width)
 
   elementSizeDidChange: ->

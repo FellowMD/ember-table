@@ -1083,6 +1083,7 @@ Ember.Table.HeaderCell = Ember.View.extend(Ember.AddeparMixins.StyleBindingsMixi
 
   onColumnResize: function(event, ui) {
     this.elementSizeDidChange();
+    this.set('column.didResize', true);
     return this.get("column").resize(ui.size.width);
   },
   elementSizeDidChange: function() {
@@ -1437,22 +1438,39 @@ Ember.Table.EmberTableComponent = Ember.Component.extend(Ember.AddeparMixins.Sty
     }
   },
   doForceFillColumns: function() {
-    var additionWidthPerColumn, availableContentWidth, defaultContentWidth, fixedColumnsWidth, numColumnToDistributeWidth, remainingWidth, tableColumns, totalWidth;
+    var additionalWidthPerColumn, availableContentWidth, columnsToDistributeWidth, defaultContentWidth, fixedColumnsWidth, hasSingleColumn, numColumnsToDistributeWidth, remainingWidth, tableColumns, totalWidth,
+      _this = this;
     totalWidth = this.get('_width');
     fixedColumnsWidth = this.get('_fixedColumnsWidth');
     tableColumns = this.get('tableColumns');
+    hasSingleColumn = this.get('tableColumns.length') === 1;
     defaultContentWidth = this._getTotalWidth(tableColumns, 'defaultColumnWidth');
     availableContentWidth = totalWidth - fixedColumnsWidth;
     if (defaultContentWidth < availableContentWidth) {
       remainingWidth = availableContentWidth - defaultContentWidth;
-      numColumnToDistributeWidth = tableColumns.filterProperty('canAutoResize').length;
-      additionWidthPerColumn = Math.floor(remainingWidth / numColumnToDistributeWidth);
+      columnsToDistributeWidth = tableColumns.filter(function(column) {
+        return column.get('canAutoResize') && !column.get('didResize');
+      });
+      numColumnsToDistributeWidth = columnsToDistributeWidth.get('length');
+      if (hasSingleColumn) {
+        numColumnsToDistributeWidth = 1;
+      }
+      additionalWidthPerColumn = Math.floor(remainingWidth / numColumnsToDistributeWidth);
       return tableColumns.forEach(function(column) {
-        var columnWidth;
+        var columnWidth, currentWidth, didResize;
+        didResize = column.get('didResize');
         if (column.get('canAutoResize')) {
-          columnWidth = column.get('defaultColumnWidth') + additionWidthPerColumn;
-          return column.set('columnWidth', columnWidth);
+          if (!didResize || hasSingleColumn) {
+            if (didResize) {
+              currentWidth = column.get('columnWidth');
+            } else {
+              currentWidth = column.get('defaultColumnWidth');
+            }
+            columnWidth = currentWidth + additionalWidthPerColumn;
+            column.set('columnWidth', columnWidth);
+          }
         }
+        return column.set('didResize', false);
       });
     }
   },
@@ -1657,17 +1675,23 @@ Ember.Table.EmberTableComponent = Ember.Component.extend(Ember.AddeparMixins.Sty
   */
 
   _getTotalWidth: function(columns, columnWidthPath) {
-    var widths;
+    var total,
+      _this = this;
     if (columnWidthPath == null) {
       columnWidthPath = 'columnWidth';
     }
     if (!columns) {
       return 0;
     }
-    widths = columns.getEach(columnWidthPath) || [];
-    return widths.reduce((function(total, w) {
-      return total + w;
-    }), 0);
+    total = 0;
+    columns.forEach(function(column) {
+      if (column.get('didResize')) {
+        return total += column.get('columnWidth');
+      } else {
+        return total += column.get(columnWidthPath);
+      }
+    });
+    return total;
   },
   click: function(event) {
     var row;

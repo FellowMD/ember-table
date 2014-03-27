@@ -151,16 +151,32 @@ Ember.AddeparMixins.ResizeHandlerMixin,
     totalWidth = @get '_width'
     fixedColumnsWidth = @get '_fixedColumnsWidth'
     tableColumns = @get 'tableColumns'
+
+    # single column is a special case -- if true, don't accommodate resizing
+    hasSingleColumn = @get('tableColumns.length') is 1
+
     defaultContentWidth = @_getTotalWidth tableColumns, 'defaultColumnWidth'
     availableContentWidth = totalWidth - fixedColumnsWidth
     if defaultContentWidth < availableContentWidth
       remainingWidth = availableContentWidth - defaultContentWidth
-      numColumnToDistributeWidth = tableColumns.filterProperty('canAutoResize').length
-      additionWidthPerColumn = Math.floor(remainingWidth / numColumnToDistributeWidth)
-      tableColumns.forEach (column) ->
+      columnsToDistributeWidth = tableColumns.filter (column) ->
+        column.get('canAutoResize') and not column.get('didResize')
+      numColumnsToDistributeWidth = columnsToDistributeWidth.get('length')
+      numColumnsToDistributeWidth = 1 if hasSingleColumn
+      additionalWidthPerColumn = Math.floor(remainingWidth / numColumnsToDistributeWidth)
+
+      # if there's 1 column and we resize it, autoresize it back
+      tableColumns.forEach (column) =>
+        didResize = column.get 'didResize'
         if column.get('canAutoResize')
-          columnWidth = column.get('defaultColumnWidth') + additionWidthPerColumn
-          column.set 'columnWidth', columnWidth
+          if not didResize or hasSingleColumn
+            if didResize
+              currentWidth = column.get 'columnWidth'
+            else
+              currentWidth = column.get 'defaultColumnWidth'
+            columnWidth = currentWidth + additionalWidthPerColumn
+            column.set 'columnWidth', columnWidth
+        column.set 'didResize', no
 
   onBodyContentLengthDidChange: Ember.observer ->
     Ember.run.next this, -> Ember.run.once this, @updateLayout
@@ -340,8 +356,13 @@ Ember.AddeparMixins.ResizeHandlerMixin,
   ###
   _getTotalWidth: (columns, columnWidthPath = 'columnWidth') ->
     return 0 unless columns
-    widths = columns.getEach(columnWidthPath) or []
-    widths.reduce ((total, w) -> total + w), 0
+    total = 0
+    columns.forEach (column) =>
+      if column.get('didResize')
+        total += column.get('columnWidth')
+      else
+        total += column.get(columnWidthPath)
+    return total
 
   ##############################################################################
   # selection
