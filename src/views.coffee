@@ -303,6 +303,8 @@ Ember.View.extend Ember.AddeparMixins.StyleBindingsMixin,
   ###
   onColumnResize: (event, ui) ->
     @elementSizeDidChange()
+    @set('column.canAutoResize', false)
+    @set('column.defaultColumnWidth', ui.size.width)
     @get("column").resize(ui.size.width)
 
   elementSizeDidChange: ->
